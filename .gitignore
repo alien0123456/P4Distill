@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+
+# Data and artifacts
+/dataset/
+/distillation/save/
+/distillation/teacher_bm_path/
+/save/
+
+# Build outputs
+/dist/
+/build/
+*.spec
+
+# Logs
+*.log
