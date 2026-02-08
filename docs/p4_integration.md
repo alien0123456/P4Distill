@@ -15,7 +15,7 @@ DistillKit exports model parameters to JSON for consumption by P4 control-plane 
 ## Example
 
 ```bash
-distillkit export --dataset BOTIOT --model-path distillation/save/.../student-best --out p4_export.json
+distillkit export --model-path distillation/save/.../student-best --out p4_export.json
 ```
 
 ## Recommended Next Step

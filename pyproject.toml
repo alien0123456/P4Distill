@@ -18,5 +18,14 @@ dependencies = [
 [project.scripts]
 distillkit = "distillkit.cli:main"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+distillkit = ["data/**/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

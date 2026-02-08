@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import pkgutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -14,9 +15,22 @@ from .export.p4_export import export_model_state_dict
 def dataset_stats(dataset: str) -> Dict:
     stats_path = dataset_stats_path(dataset)
     if not stats_path.exists():
-        raise FileNotFoundError(f"statistics.json not found: {stats_path}")
+        bundled = pkgutil.get_data("distillkit", f"data/{dataset}/statistics.json")
+        if bundled is not None:
+            return json.loads(bundled.decode("utf-8"))
+        raise FileNotFoundError(
+            f"statistics.json not found: {stats_path}. "
+            "Set DISTILLKIT_DATASET_ROOT or place dataset files under dataset/<DATASET>/json/."
+        )
     with stats_path.open("r", encoding="utf-8") as fp:
         return json.load(fp)
+
+
+def _dataset_json_path(dataset: str, filename: str) -> str:
+    dataset_root = os.getenv("DISTILLKIT_DATASET_ROOT")
+    if dataset_root:
+        return str(Path(dataset_root) / dataset / "json" / filename)
+    return str(repo_root() / "dataset" / dataset / "json" / filename)
 
 
 def _get_model_class(name: str):
@@ -83,14 +97,15 @@ def run_distillation(
     extra_args: Optional[List[str]] = None,
     output_dir: Optional[str] = None,
     student_model: str = "BinaryRNN",
+    teacher_bm_path: Optional[str] = None,
 ) -> str:
     import torch
 
     ensure_distillation_on_path()
     args = build_args(dataset, teacher_model, loss_type, extra_args or [])
 
-    args.train_path = str(repo_root() / "dataset" / dataset / "json" / "train.json")
-    args.test_path = str(repo_root() / "dataset" / dataset / "json" / "test.json")
+    args.train_path = _dataset_json_path(dataset, "train.json")
+    args.test_path = _dataset_json_path(dataset, "test.json")
 
     stats = dataset_stats(dataset)
     args.labels_num = stats["label_num"]
@@ -115,9 +130,20 @@ def run_distillation(
 
     set_seed(args.seed)
 
-    args.teacher_bestmodel_path = (
-        f"teacher_bm_path/{args.dataset}/{args.teacher_model}/teacher-brnn-best"
+    teacher_root = (
+        teacher_bm_path
+        or os.getenv("DISTILLKIT_TEACHER_BM_ROOT")
+        or str(repo_root() / "distillation" / "teacher_bm_path")
     )
+    args.teacher_bestmodel_path = str(
+        Path(teacher_root) / args.dataset / args.teacher_model / "teacher-brnn-best"
+    )
+    if not Path(args.teacher_bestmodel_path).exists():
+        raise FileNotFoundError(
+            "Teacher checkpoint not found: "
+            f"{args.teacher_bestmodel_path}. "
+            "Use --teacher-bm-path or set DISTILLKIT_TEACHER_BM_ROOT."
+        )
 
     TeacherClass = _get_model_class(args.teacher_model)
     StudentClass = _get_model_class(student_model)
@@ -160,8 +186,10 @@ def evaluate_model(
     ensure_distillation_on_path()
     args = build_args(dataset, teacher_model="BinaryLSTM", loss_type="KL", extra_args=extra_args or [])
 
-    args.train_path = str(repo_root() / "dataset" / dataset / "json" / "train.json")
-    args.test_path = str(repo_root() / "dataset" / dataset / "json" / "test.json")
+    args.train_path = _dataset_json_path(dataset, "train.json")
+    args.test_path = _dataset_json_path(dataset, "test.json")
+    # `STrainer` expects `args.output_dir`; for eval use model directory as default.
+    args.output_dir = str(Path(model_path).resolve().parent)
 
     stats = dataset_stats(dataset)
     args.labels_num = stats["label_num"]

@@ -7,7 +7,11 @@ __pycache__/
 venv/
 
 # Data and artifacts
-/dataset/
+/dataset/*
+!/dataset/BOTIOT/
+!/dataset/BOTIOT/json/
+!/dataset/BOTIOT/json/.gitkeep
+!/dataset/BOTIOT/json/README.md
 /distillation/save/
 /distillation/teacher_bm_path/
 /save/

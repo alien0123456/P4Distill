@@ -11,7 +11,11 @@ from typing import List
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists() and (parent / "src").exists():
+            return parent
+    return current.parents[3]
 
 
 def distillation_dir() -> Path:
@@ -27,9 +31,7 @@ def ensure_distillation_on_path() -> Path:
 
 def _opts_module_for_dataset(dataset: str):
     name_map = {
-        "ISCXVPN2016": "opts_iscx2016",
         "BOTIOT": "opts_botiot",
-        "CICIOT2022": "opts_ciciot",
     }
     if dataset not in name_map:
         raise ValueError(f"Unsupported dataset: {dataset}")
@@ -50,7 +52,7 @@ def build_args(
     parser.add_argument(
         "--dataset",
         default=dataset,
-        choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022", "PeerRush"],
+        choices=["BOTIOT"],
     )
     parser.add_argument(
         "--teacher_model",
@@ -73,4 +75,7 @@ def build_args(
 
 
 def dataset_stats_path(dataset: str) -> Path:
+    dataset_root = os.getenv("DISTILLKIT_DATASET_ROOT")
+    if dataset_root:
+        return Path(dataset_root) / dataset / "json" / "statistics.json"
     return repo_root() / "dataset" / dataset / "json" / "statistics.json"

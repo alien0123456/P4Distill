@@ -10,5 +10,6 @@ Key layers
 
 Data flow
 - Dataset JSON -> `FlowDataset` -> student model training via `trainer2`.
-- Teacher model is loaded from `distillation/teacher_bm_path/...`.
+- Teacher model is loaded from `--teacher-bm-path` / `DISTILLKIT_TEACHER_BM_ROOT`
+  or default `distillation/teacher_bm_path/...`.
 - Metrics are computed via `utils.metric.metric_from_confuse_matrix`.

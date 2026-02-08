@@ -1,0 +1,11 @@
+{
+  "dataset": "BOTIOT",
+  "label_num": 4,
+  "labels": [
+    "DataExfiltration",
+    "Keylogging",
+    "OSScan",
+    "ServiceScan"
+  ],
+  "note": "Competition release ships BOTIOT metadata only. Provide train.json and test.json under dataset/BOTIOT/json/ for distill/eval."
+}

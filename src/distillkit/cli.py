@@ -18,11 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_stats = sub.add_parser("stats", help="Show dataset statistics.")
-    p_stats.add_argument("--dataset", required=True, choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022"])
+    p_stats.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
     p_stats.add_argument("--out", default="", help="Optional JSON output path.")
 
     p_distill = sub.add_parser("distill", help="Run knowledge distillation training.")
-    p_distill.add_argument("--dataset", required=True, choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022"])
+    p_distill.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
     p_distill.add_argument(
         "--teacher-model",
         required=True,
@@ -48,9 +48,17 @@ def build_parser() -> argparse.ArgumentParser:
             "BiLSTM2WithAttention",
         ],
     )
+    p_distill.add_argument(
+        "--teacher-bm-path",
+        default="",
+        help=(
+            "Root directory containing teacher checkpoints (e.g. "
+            "/root/kaiyuan2/distillation/teacher_bm_path)."
+        ),
+    )
 
     p_eval = sub.add_parser("eval", help="Evaluate a saved student model.")
-    p_eval.add_argument("--dataset", required=True, choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022"])
+    p_eval.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
     p_eval.add_argument("--model-path", required=True)
     p_eval.add_argument(
         "--student-model",
@@ -67,7 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval.add_argument("--out", default="", help="Optional JSON output path.")
 
     p_export = sub.add_parser("export", help="Export model for P4 integration.")
-    p_export.add_argument("--dataset", required=True, choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022"])
+    p_export.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
     p_export.add_argument("--model-path", required=True)
     p_export.add_argument("--out", required=True)
     p_export.add_argument("--quantize", default="int8", choices=["none", "int8", "int16"])
@@ -99,10 +107,11 @@ def _split_extra_args(argv: List[str]) -> List[str]:
 
 def _handle_wizard() -> None:
     print("DistillKit Wizard")
-    dataset = input("Dataset (ISCXVPN2016/BOTIOT/CICIOT2022): ").strip() or "BOTIOT"
+    dataset = input("Dataset (BOTIOT): ").strip() or "BOTIOT"
     teacher = input("Teacher model (BinaryLSTM/BinaryLSTMWithAttention/...): ").strip() or "BinaryLSTM"
     loss_type = input("Loss type (KL): ").strip() or "KL"
     output_dir = input("Output dir (blank for default): ").strip()
+    teacher_bm_path = input("Teacher checkpoint root (blank for default): ").strip()
     run_now = input("Run now? (y/N): ").strip().lower() == "y"
 
     if run_now:
@@ -111,12 +120,15 @@ def _handle_wizard() -> None:
             teacher_model=teacher,
             loss_type=loss_type,
             output_dir=output_dir or None,
+            teacher_bm_path=teacher_bm_path or None,
         )
         print(f"Training finished. Output: {out}")
     else:
         cmd = f"distillkit distill --dataset {dataset} --teacher-model {teacher} --loss-type {loss_type}"
         if output_dir:
             cmd += f" --output-dir {output_dir}"
+        if teacher_bm_path:
+            cmd += f" --teacher-bm-path {teacher_bm_path}"
         print("Run this command:")
         print(cmd)
 
@@ -143,6 +155,7 @@ def main(argv: List[str] | None = None) -> int:
             extra_args=extra_args,
             output_dir=args.output_dir or None,
             student_model=args.student_model,
+            teacher_bm_path=args.teacher_bm_path or None,
         )
         print(f"Output: {out}")
         return 0
