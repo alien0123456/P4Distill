@@ -1,9 +1,8 @@
-"""Helpers to reuse existing distillation scripts safely."""
+"""Helpers to bridge distillkit wrappers and distillation package."""
 
 from __future__ import annotations
 
 import argparse
-import importlib
 import os
 import sys
 from pathlib import Path
@@ -11,6 +10,8 @@ from typing import List
 
 
 def repo_root() -> Path:
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
     current = Path(__file__).resolve()
     for parent in current.parents:
         if (parent / "pyproject.toml").exists() and (parent / "src").exists():
@@ -18,41 +19,22 @@ def repo_root() -> Path:
     return current.parents[3]
 
 
-def distillation_dir() -> Path:
-    return repo_root() / "distillation"
-
-
-def ensure_distillation_on_path() -> Path:
-    ddir = distillation_dir()
-    if str(ddir) not in sys.path:
-        sys.path.insert(0, str(ddir))
-    return ddir
-
-
-def _opts_module_for_dataset(dataset: str):
-    name_map = {
-        "BOTIOT": "opts_botiot",
-    }
-    if dataset not in name_map:
-        raise ValueError(f"Unsupported dataset: {dataset}")
-    module_name = name_map[dataset]
-    return importlib.import_module(module_name)
-
-
 def build_args(
     dataset: str,
     teacher_model: str,
-    loss_type: str,
+    loss_scope: str,
     extra_args: List[str] | None = None,
 ) -> argparse.Namespace:
-    ensure_distillation_on_path()
-    opts_mod = _opts_module_for_dataset(dataset)
+    if dataset != "ISCXVPN2016":
+        raise ValueError(f"Unsupported dataset: {dataset}")
+
+    from distillation.opts import distill_opts, model_opts, training_opts
 
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         "--dataset",
         default=dataset,
-        choices=["BOTIOT"],
+        choices=["ISCXVPN2016"],
     )
     parser.add_argument(
         "--teacher_model",
@@ -65,10 +47,11 @@ def build_args(
             "BiLSTM2WithAttention",
         ],
     )
-    parser.add_argument("--loss_type", default=loss_type, choices=["KL"])
+    parser.add_argument("--loss_scope", default=loss_scope, choices=["single", "all"])
 
-    opts_mod.model_opts(parser)
-    opts_mod.training_opts(parser)
+    model_opts(parser)
+    training_opts(parser)
+    distill_opts(parser, require_teacher_ckpt=False)
 
     args = parser.parse_args(extra_args or [])
     return args

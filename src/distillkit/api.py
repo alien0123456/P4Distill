@@ -8,7 +8,7 @@ import pkgutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .core.legacy import build_args, dataset_stats_path, ensure_distillation_on_path, repo_root
+from .core.legacy import build_args, dataset_stats_path, repo_root
 from .export.p4_export import export_model_state_dict
 
 
@@ -34,60 +34,43 @@ def _dataset_json_path(dataset: str, filename: str) -> str:
 
 
 def _get_model_class(name: str):
-    ensure_distillation_on_path()
     if name == "BinaryRNN":
-        from model.model_BRNN import BinaryRNN
+        from distillation.model.sturent_BRNN_from_BOS import BinaryRNN
 
         return BinaryRNN
     if name == "BinaryLSTM":
-        from model.Binary.model_BLSTM import BinaryLSTM
+        from distillation.model.teacher_BLSTM import BinaryLSTM
 
         return BinaryLSTM
     if name == "BinaryL3LSTM":
-        from model.Binary.model_BL3LSTM import BinaryL3LSTM
+        from distillation.model.teacher_BL3LSTM import BinaryL3LSTM
 
         return BinaryL3LSTM
     if name == "BinaryLSTMWithAttention":
-        from model.Binary.model_BATLSTM import BinaryLSTMWithAttention
+        from distillation.model.teacher_BATLSTM import BinaryLSTMWithAttention
 
         return BinaryLSTMWithAttention
     if name == "BiLSTMWithAttention":
-        from model.Binary.model_BBiATLSTM import BiLSTMWithAttention
+        from distillation.model.teacher_BBiATLSTM import BiLSTMWithAttention
 
         return BiLSTMWithAttention
     if name == "BiLSTM2WithAttention":
-        from model.Binary.model_BBi2ATLSTM import BiLSTM2WithAttention
+        from distillation.model.teacher_BBi2ATLSTM import BiLSTM2WithAttention
 
         return BiLSTM2WithAttention
     raise ValueError(f"Unknown model name: {name}")
 
 
-def _compute_class_weights(args, stats):
-    import numpy as np
-    import torch
-    from sklearn.utils.class_weight import compute_class_weight
-
-    labels_num = stats.get("label_num", args.labels_num)
-    flow_split = stats.get("train num / test num (flow)")
-    if args.dataset == "BOTIOT" and flow_split:
-        class_names = ["DataExfiltration", "Keylogging", "OSScan", "ServiceScan"]
-        if all(name in flow_split for name in class_names):
-            train_counts = []
-            for cls_name in class_names:
-                train_num_str, _ = flow_split[cls_name].split(" / ")
-                train_counts.append(int(train_num_str))
-            y_train = []
-            for class_id, count in enumerate(train_counts):
-                y_train.extend([class_id] * count)
-            y_train = np.array(y_train)
-            class_weights = compute_class_weight(
-                "balanced",
-                classes=np.arange(labels_num),
-                y=y_train,
-            ).astype(np.float32)
-            return torch.tensor(class_weights, dtype=torch.float)
-
-    return torch.ones(labels_num, dtype=torch.float)
+def _teacher_ckpt_path(dataset: str, teacher_model: str, teacher_bm_path: Optional[str]) -> Path:
+    if teacher_bm_path:
+        root = Path(teacher_bm_path)
+    elif os.getenv("DISTILLKIT_TEACHER_BM_ROOT"):
+        root = Path(os.getenv("DISTILLKIT_TEACHER_BM_ROOT", ""))
+    else:
+        default_root = repo_root() / "teacher_bm_path"
+        legacy_root = repo_root() / "distillation" / "teacher_bm_path"
+        root = default_root if default_root.exists() else legacy_root
+    return root / dataset / teacher_model / "teacher-brnn-best"
 
 
 def run_distillation(
@@ -101,75 +84,90 @@ def run_distillation(
 ) -> str:
     import torch
 
-    ensure_distillation_on_path()
-    args = build_args(dataset, teacher_model, loss_type, extra_args or [])
+    if loss_type != "KL":
+        raise ValueError("Only KL distillation is supported by distillation pipeline.")
+    if student_model != "BinaryRNN":
+        raise ValueError("Current distillation pipeline supports student_model='BinaryRNN' only.")
+
+    args = build_args(dataset, teacher_model, "all", extra_args or [])
 
     args.train_path = _dataset_json_path(dataset, "train.json")
     args.test_path = _dataset_json_path(dataset, "test.json")
 
     stats = dataset_stats(dataset)
-    args.labels_num = stats["label_num"]
-    args.class_weights = _compute_class_weights(args, stats)
+    args.num_classes = stats["label_num"]
+    args.class_weights = [1] * args.num_classes
 
     if output_dir:
-        args.output_dir = output_dir
+        args.output_dir = str(Path(output_dir))
     else:
         args.output_dir = (
-            f"./save/{args.dataset}/{args.teacher_model}/{args.loss_type}/"
-            f"studentbrnn_len{args.len_embedding_bits}_ipd{args.ipd_embedding_bits}_"
-            f"ev{args.embedding_vector_bits}_hidden{args.rnn_hidden_bits}_"
-            f"{args.loss_factor}_{args.focal_loss_gamma}_{args.loss_type}_{args.learning_rate}_"
-            f"T{args.T}_a{args.a}/"
+            f"./save_kd/{args.dataset}/T_{args.teacher_model}_/S_BRNN/"
+            f"len{args.pkt_len_embed_bits}_ipd{args.ipd_embed_bits}_"
+            f"ev{args.embed_dim_bits}_hidden{args.rnn_hidden_state_bits}_/"
+            f"kd_a{args.kd_alpha}_t{args.kd_temperature}_lr{args.lr}/"
         )
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    from utils.seed import set_seed
-    from utils.model_rwi import initialize_parameters, load_model
-    from trainer2 import build_optimizer, build_data_loader, STrainer
+    from distillation.trainers.student_trainer import DistillTrainer
+    from distillation.trainers.teacher_trainer import build_optimizer
+    from distillation.utils.checkpoint import initialize_parameters, load_model
+    from distillation.utils.data_loader import build_data_loader
+    from distillation.utils.seed import build_generator, seed_worker, set_seed
 
-    set_seed(args.seed)
+    set_seed(args.random_seed)
+    dl_generator = build_generator(args.random_seed)
 
-    teacher_root = (
-        teacher_bm_path
-        or os.getenv("DISTILLKIT_TEACHER_BM_ROOT")
-        or str(repo_root() / "distillation" / "teacher_bm_path")
-    )
-    args.teacher_bestmodel_path = str(
-        Path(teacher_root) / args.dataset / args.teacher_model / "teacher-brnn-best"
-    )
-    if not Path(args.teacher_bestmodel_path).exists():
+    args.teacher_ckpt_path = str(_teacher_ckpt_path(args.dataset, args.teacher_model, teacher_bm_path))
+    if not Path(args.teacher_ckpt_path).exists():
         raise FileNotFoundError(
             "Teacher checkpoint not found: "
-            f"{args.teacher_bestmodel_path}. "
+            f"{args.teacher_ckpt_path}. "
             "Use --teacher-bm-path or set DISTILLKIT_TEACHER_BM_ROOT."
         )
 
     TeacherClass = _get_model_class(args.teacher_model)
-    StudentClass = _get_model_class(student_model)
+    StudentClass = _get_model_class("BinaryRNN")
 
     teacher = TeacherClass(args)
     student = StudentClass(args)
 
-    load_model(teacher, args.teacher_bestmodel_path)
+    load_model(teacher, args.teacher_ckpt_path)
     teacher.eval()
 
     initialize_parameters(args, student)
 
-    if args.gpu_id is not None and torch.cuda.is_available():
-        torch.cuda.set_device(args.gpu_id)
-        teacher.cuda(args.gpu_id)
-        student.cuda(args.gpu_id)
+    if args.cuda_device_id is not None and torch.cuda.is_available():
+        torch.cuda.set_device(args.cuda_device_id)
+        teacher.cuda(args.cuda_device_id)
+        student.cuda(args.cuda_device_id)
     else:
-        args.gpu_id = None
+        args.cuda_device_id = None
 
-    optimizer, scheduler = build_optimizer(args, student)
+    optimizer, _ = build_optimizer(args, student)
 
-    train_loader = build_data_loader(args, args.train_path, args.batch_size, is_train=True, shuffle=True)
-    test_loader = build_data_loader(args, args.test_path, args.batch_size, is_train=False, shuffle=False)
+    train_loader = build_data_loader(
+        args,
+        args.train_path,
+        args.train_batch_size,
+        is_train=True,
+        shuffle=True,
+        generator=dl_generator,
+        worker_init_fn=seed_worker,
+    )
+    test_loader = build_data_loader(
+        args,
+        args.test_path,
+        args.train_batch_size,
+        is_train=False,
+        shuffle=False,
+        generator=dl_generator,
+        worker_init_fn=seed_worker,
+    )
 
-    trainer = STrainer(args)
-    trainer.Strain(args, train_loader, test_loader, teacher, student, optimizer, scheduler)
+    trainer = DistillTrainer(args)
+    trainer.train(args, train_loader, test_loader, student, teacher, optimizer)
 
     return args.output_dir
 
@@ -183,35 +181,35 @@ def evaluate_model(
     import numpy as np
     import torch
 
-    ensure_distillation_on_path()
-    args = build_args(dataset, teacher_model="BinaryLSTM", loss_type="KL", extra_args=extra_args or [])
+    args = build_args(dataset, teacher_model="BinaryLSTM", loss_scope="all", extra_args=extra_args or [])
 
     args.train_path = _dataset_json_path(dataset, "train.json")
     args.test_path = _dataset_json_path(dataset, "test.json")
-    # `STrainer` expects `args.output_dir`; for eval use model directory as default.
     args.output_dir = str(Path(model_path).resolve().parent)
 
     stats = dataset_stats(dataset)
-    args.labels_num = stats["label_num"]
+    args.num_classes = stats["label_num"]
+    args.class_weights = [1] * args.num_classes
 
-    from utils.model_rwi import load_model
-    from trainer2 import build_data_loader, STrainer
-    from utils.metric import metric_from_confuse_matrix
+    from distillation.trainers.student_trainer import DistillTrainer
+    from distillation.utils.checkpoint import load_model
+    from distillation.utils.classification_metrics import metric_from_confuse_matrix
+    from distillation.utils.data_loader import build_data_loader
 
     StudentClass = _get_model_class(student_model)
     model = StudentClass(args)
     load_model(model, model_path)
 
-    if args.gpu_id is not None and torch.cuda.is_available():
-        torch.cuda.set_device(args.gpu_id)
-        model.cuda(args.gpu_id)
+    if args.cuda_device_id is not None and torch.cuda.is_available():
+        torch.cuda.set_device(args.cuda_device_id)
+        model.cuda(args.cuda_device_id)
     else:
-        args.gpu_id = None
+        args.cuda_device_id = None
 
-    test_loader = build_data_loader(args, args.test_path, args.batch_size, is_train=False, shuffle=False)
+    test_loader = build_data_loader(args, args.test_path, args.train_batch_size, is_train=False, shuffle=False)
 
-    trainer = STrainer(args)
-    conf_mat, test_total_loss, test_samples = trainer.Svalidate(args, test_loader, model)
+    trainer = DistillTrainer(args)
+    conf_mat, test_total_loss, test_samples, _ = trainer.validate(args, test_loader, model)
 
     pres, recs, f1s, logs = metric_from_confuse_matrix(conf_mat)
 
@@ -234,13 +232,13 @@ def export_p4(
     quantize: str = "int8",
     scale: Optional[float] = None,
 ) -> str:
-    ensure_distillation_on_path()
-    args = build_args(dataset, teacher_model="BinaryLSTM", loss_type="KL", extra_args=extra_args or [])
+    args = build_args(dataset, teacher_model="BinaryLSTM", loss_scope="all", extra_args=extra_args or [])
+    args.num_classes = dataset_stats(dataset)["label_num"]
 
     StudentClass = _get_model_class(student_model)
     model = StudentClass(args)
 
-    from utils.model_rwi import load_model
+    from distillation.utils.checkpoint import load_model
 
     load_model(model, model_path)
 

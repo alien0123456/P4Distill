@@ -1,0 +1,9 @@
+| segs 230521 (flows 1896)
+| label        0| segs     2717 (flows      120)| precision    0.713| recall    0.526| f1    0.606
+| label        1| segs    18521 (flows      414)| precision    0.919| recall    0.690| f1    0.788
+| label        2| segs    51154 (flows       97)| precision    0.803| recall    0.849| f1    0.825
+| label        3| segs    39488 (flows      353)| precision    0.908| recall    0.709| f1    0.796
+| label        4| segs    21230 (flows      673)| precision    0.894| recall    0.952| f1    0.922
+| label        5| segs    97411 (flows      239)| precision    0.844| recall    0.928| f1    0.884
+| Macro| precision    0.847| recall    0.776| f1    0.803
+

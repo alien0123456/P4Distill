@@ -18,11 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_stats = sub.add_parser("stats", help="Show dataset statistics.")
-    p_stats.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
+    p_stats.add_argument("--dataset", default="ISCXVPN2016", choices=["ISCXVPN2016"])
     p_stats.add_argument("--out", default="", help="Optional JSON output path.")
 
     p_distill = sub.add_parser("distill", help="Run knowledge distillation training.")
-    p_distill.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
+    p_distill.add_argument("--dataset", default="ISCXVPN2016", choices=["ISCXVPN2016"])
     p_distill.add_argument(
         "--teacher-model",
         required=True,
@@ -39,26 +39,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_distill.add_argument(
         "--student-model",
         default="BinaryRNN",
-        choices=[
-            "BinaryRNN",
-            "BinaryLSTM",
-            "BinaryLSTMWithAttention",
-            "BinaryL3LSTM",
-            "BiLSTMWithAttention",
-            "BiLSTM2WithAttention",
-        ],
+        choices=["BinaryRNN"],
+        help="Distillation pipeline currently supports BinaryRNN only.",
     )
     p_distill.add_argument(
         "--teacher-bm-path",
         default="",
         help=(
             "Root directory containing teacher checkpoints (e.g. "
-            "/root/kaiyuan2/distillation/teacher_bm_path)."
+            "/root/kaiyuan2/teacher_bm_path)."
         ),
     )
 
     p_eval = sub.add_parser("eval", help="Evaluate a saved student model.")
-    p_eval.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
+    p_eval.add_argument("--dataset", default="ISCXVPN2016", choices=["ISCXVPN2016"])
     p_eval.add_argument("--model-path", required=True)
     p_eval.add_argument(
         "--student-model",
@@ -75,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval.add_argument("--out", default="", help="Optional JSON output path.")
 
     p_export = sub.add_parser("export", help="Export model for P4 integration.")
-    p_export.add_argument("--dataset", default="BOTIOT", choices=["BOTIOT"])
+    p_export.add_argument("--dataset", default="ISCXVPN2016", choices=["ISCXVPN2016"])
     p_export.add_argument("--model-path", required=True)
     p_export.add_argument("--out", required=True)
     p_export.add_argument("--quantize", default="int8", choices=["none", "int8", "int16"])
@@ -107,7 +101,7 @@ def _split_extra_args(argv: List[str]) -> List[str]:
 
 def _handle_wizard() -> None:
     print("DistillKit Wizard")
-    dataset = input("Dataset (BOTIOT): ").strip() or "BOTIOT"
+    dataset = input("Dataset (ISCXVPN2016): ").strip() or "ISCXVPN2016"
     teacher = input("Teacher model (BinaryLSTM/BinaryLSTMWithAttention/...): ").strip() or "BinaryLSTM"
     loss_type = input("Loss type (KL): ").strip() or "KL"
     output_dir = input("Output dir (blank for default): ").strip()

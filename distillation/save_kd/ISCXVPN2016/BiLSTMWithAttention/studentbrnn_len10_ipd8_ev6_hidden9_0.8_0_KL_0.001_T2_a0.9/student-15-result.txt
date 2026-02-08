@@ -1,0 +1,18 @@
+Training set: 1020657 segs, average loss 1.054437678587041
+| label        0| segs    21835| precision     0.00| recall     0.00| f1     0.00
+| label        1| segs    58479| precision     0.33| recall     0.04| f1     0.06
+| label        2| segs   240323| precision     0.57| recall     0.00| f1     0.00
+| label        3| segs   194121| precision     0.59| recall     0.50| f1     0.54
+| label        4| segs   110193| precision     0.69| recall     0.95| f1     0.80
+| label        5| segs   395706| precision     0.52| recall     0.92| f1     0.67
+| Macro| precision     0.45| recall     0.40| f1     0.34
+
+Testing set: 230521 segs, average loss 1.0578375619280993
+| label        0| segs     2717| precision     0.00| recall     0.00| f1     0.00
+| label        1| segs    18521| precision     0.58| recall     0.27| f1     0.37
+| label        2| segs    51154| precision     0.00| recall     0.00| f1     0.00
+| label        3| segs    39488| precision     0.51| recall     0.50| f1     0.50
+| label        4| segs    21230| precision     0.72| recall     0.86| f1     0.78
+| label        5| segs    97411| precision     0.56| recall     0.91| f1     0.69
+| Macro| precision     0.40| recall     0.42| f1     0.39
+
