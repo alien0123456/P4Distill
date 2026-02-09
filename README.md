@@ -129,43 +129,56 @@ All functionalities are exposed through both a command-line interface (`distillk
 
 ## Quick Start
 
-### 1) Install
+#### Included Executables
+| Executable          | Purpose                                  |
+|---------------------|------------------------------------------|
+| `train_teacher.exe` | Train the teacher neural network         |
+| `distill.exe`       | Execute knowledge distillation           |
+| `evaluator.exe`     | Evaluate and compare teacher/student models |
+
+
+### 1) Train Teacher Model
 
 ```bash
-pip install -e .
+train_teacher.exe ^
+  --dataset ISCXVPN2016 ^
+  --model_name BinaryRNN ^
+  --max_epochs 10 ^
+  --train_batch_size 64 ^
+  --lr 0.005 ^
+  --cuda_device_id 0
 ```
 
-### 2) Show dataset statistics
+### 2) Run Knowledge Distillation
 
 ```bash
-distillkit stats
+distill.exe ^
+  --dataset ISCXVPN2016 ^
+  --teacher_model BiLSTMWithAttention ^
+  --teacher_ckpt_path ./teacher_bm_path/ISCXVPN2016/BiLSTMWithAttention/teacher-brnn-best ^
+  --kd_alpha 0.1 ^
+  --kd_temperature 4.0 ^
+  --max_epochs 10 ^
+  --train_batch_size 64 ^
+  --lr 0.005 ^
+  --cuda_device_id 0
 ```
 
-### 3) Run distillation (CLI)
+### 3) Evaluate & Analyze Models
 
 ```bash
-distillkit distill \
-  --teacher-model BiLSTMWithAttention \
-  --teacher-bm-path ./teacher_bm_path
+evaluator.exe ^
+  --baseline-dir ./distillation/save/ISCXVPN2016/BinaryRNN/len10_ipd8_ev6_hidden9_0.8_0_all_0.01 ^
+  --distill-dir  ./distillation/save_kd/ISCXVPN2016/BiLSTMWithAttention/studentbrnn_len10_ipd8_ev6_hidden9_0.8_0_KL_0.001_T2_a0.9 ^
+  --out-dir      ./distillation/save/ISCXVPN2016/compare_reports/run1
+
 ```
 
-### 4) Evaluate a trained model
+### 4) Export Model for P4 (Coming Soon)
 
 ```bash
-distillkit eval --model-path save_kd/.../student-best
-```
-
-Example:
-
-```bash
-distillkit eval \
-  --model-path save_kd/ISCXVPN2016/T_BiLSTMWithAttention_/S_BRNN/len10_ipd8_ev6_hidden9_/kd_a0.1_t4.0_lr0.01/student-best
-```
-
-### 5) Export for P4
-
-```bash
-distillkit export --model-path save_kd/.../student-best --out export.json
+# Export distilled model to P4 deployment format
+# distillkit export --model-path path/to/student-best --out export.json
 ```
 
 ---
