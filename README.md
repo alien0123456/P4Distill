@@ -123,7 +123,7 @@ All functionalities are exposed through both a command-line interface (`distillk
     
 
 ---
-s
+
 ## Quick Start : Run via Python Modules
 
 #### Key Workflows
