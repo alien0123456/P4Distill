@@ -15,8 +15,7 @@ While prior systems mitigate quantization-induced accuracy loss using techniques
 
 To address this bottleneck, **DistillKit adopts an architecture-agnostic knowledge distillation approach**. During control-plane training, a high-precision software model acts as a _teacher_ and provides soft labels (logits) to guide a fixed, deployable _student_ model. By enriching supervision with inter-class similarity information, distillation complements existing STE/QAT techniques and significantly improves accuracy under extreme quantization **without changing the P4 program, inference logic, or runtime pipeline**.
 
-> _(You may place the corresponding paper figure here to illustrate the accuracy gap under P4 constraints and the effect of distillation.)_
-
+![Distillation improves P4-deployable models](image.png)
 ---
 
 ## Distillation Method
@@ -29,8 +28,6 @@ DistillKit implements a **logit-based knowledge distillation framework** based o
     
 
 Importantly, distillation in DistillKit is **architecture-agnostic**: it does not depend on model internals, quantization schemes, or P4-specific inference mappings. The student architecture, bit-width, and deployment footprint remain unchanged. After training, deployment simply replaces the model parameters, making distillation a _drop-in optimization layer_ for existing P4 pipelines.
-
-![Distillation improves P4-deployable models](image.png)
 
 ---
 
