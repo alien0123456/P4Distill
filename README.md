@@ -126,69 +126,30 @@ All functionalities are exposed through both a command-line interface (`distillk
     
 
 ---
+s
+## Quick Start : Run via Python Modules
 
-## Quick Start
+#### Key Workflows
+| **Workflow**               | **Purpose**                                  | **Status**       |
+|----------------------------|----------------------------------------------|------------------|
+| `train_teacher`            | Train the teacher neural network             | Completed        |
+| `distill`                  | Execute knowledge distillation               | Completed        |
+| `evaluator`                | Evaluate and compare teacher/student models  | Completed        |
+| `Export Model for P4`      | Export distilled model to P4 deployment format | Coming Soon    |
 
-#### Included Executables
-| Executable          | Purpose                                  |
-|---------------------|------------------------------------------|
-| `train_teacher.exe` | Train the teacher neural network         |
-| `distill.exe`       | Execute knowledge distillation           |
-| `evaluator.exe`     | Evaluate and compare teacher/student models |
 
 
-### 1) Train Teacher Model
+This toolkit provides a set of Python modules for training, knowledge distillation, and evaluation of neural network models for network traffic classification. The following instructions guide you through the setup and execution.
 
+### 1) Install Dependencies
+Before running the code, make sure to install the required dependencies. You can install them using
 ```bash
-train_teacher.exe ^
-  --dataset ISCXVPN2016 ^
-  --model_name BinaryRNN ^
-  --max_epochs 10 ^
-  --train_batch_size 64 ^
-  --lr 0.005 ^
-  --cuda_device_id 0
+pip install -r requirements.txt
 ```
 
-### 2) Run Knowledge Distillation
 
-```bash
-distill.exe ^
-  --dataset ISCXVPN2016 ^
-  --teacher_model BiLSTMWithAttention ^
-  --teacher_ckpt_path ./teacher_bm_path/ISCXVPN2016/BiLSTMWithAttention/teacher-brnn-best ^
-  --kd_alpha 0.1 ^
-  --kd_temperature 4.0 ^
-  --max_epochs 10 ^
-  --train_batch_size 64 ^
-  --lr 0.005 ^
-  --cuda_device_id 0
-```
-
-### 3) Evaluate & Analyze Models
-
-```bash
-evaluator.exe ^
-  --baseline-dir ./distillation/save/ISCXVPN2016/BinaryRNN/len10_ipd8_ev6_hidden9_0.8_0_all_0.01 ^
-  --distill-dir  ./distillation/save_kd/ISCXVPN2016/BiLSTMWithAttention/studentbrnn_len10_ipd8_ev6_hidden9_0.8_0_KL_0.001_T2_a0.9 ^
-  --out-dir      ./distillation/save/ISCXVPN2016/compare_reports/run1
-
-```
-
-### 4) Export Model for P4 (Coming Soon)
-
-```bash
-# Export distilled model to P4 deployment format
-# distillkit export --model-path path/to/student-best --out export.json
-```
-
----
-
-## Run via Python Modules (Reference)
-
-The following commands demonstrate that the underlying training and distillation code can be executed directly.
-
-### Train a teacher model
-
+### 2) Train a teacher model
+To train the teacher model, use the following command:
 ```bash
 python -m distillation.train_teacher \
   --dataset ISCXVPN2016 \
@@ -199,8 +160,8 @@ python -m distillation.train_teacher \
   --cuda_device_id 0
 ```
 
-### Run distillation
-
+### 3) Run distillation
+After the teacher model has been trained, you can run knowledge distillation to train the student model. Use the following command:
 ```bash
 python -m distillation.distill \
   --dataset ISCXVPN2016 \
@@ -213,8 +174,10 @@ python -m distillation.distill \
   --lr 0.005 \
   --cuda_device_id 0
 ```
+This will perform knowledge distillation using the BiLSTMWithAttention teacher model and the specified checkpoint path for the teacher model. The student model will be trained for 10 epochs.
 
-### Evaluate and Analyze Models
+### 4) Evaluate and Analyze Models
+Once the teacher and student models have been trained, you can evaluate and compare their performance using the following command:
 
 ```bash
 python -m distillation.evaluator.evaluator \
@@ -222,6 +185,17 @@ python -m distillation.evaluator.evaluator \
   --distill-dir  ./distillation/save_kd/ISCXVPN2016/BiLSTMWithAttention/studentbrnn_len10_ipd8_ev6_hidden9_0.8_0_KL_0.001_T2_a0.9 \
   --out-dir      ./distillation/save/ISCXVPN2016/compare_reports/run1
 ```
+This command compares the baseline BinaryRNN model with the distilled studentbrnn model and outputs the results to the specified directory.
+
+
+### 5) Export Model for P4 (Coming Soon)
+The export functionality is still in development. However, you will soon be able to export the distilled model to a P4 deployment format. Stay tuned for updates!
+
+```bash
+# Export distilled model to P4 deployment format
+# python -m distillation.export --model-path path/to/student-best --out export.json
+```
+
 ---
 
 ## Dataset Layout (ISCXVPN2016)
@@ -246,11 +220,11 @@ teacher_bm_path/
 
 ---
 
-## Build Executable (Single File)
+## Steps to Build the Executable:
 
 ```bash
 pip install pyinstaller
-powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1
+pyinstaller -F --name train_teacher distillation/train_teacher.py
 ```
 
 Output:
@@ -259,6 +233,17 @@ Output:
 dist/distillkit.exe
 ```
 
+Run:
+
+```bash
+train_teacher.exe ^
+--dataset ISCXVPN2016 ^
+--model_name BinaryRNN ^
+--max_epochs 10 ^
+--train_batch_size 64 ^
+--lr 0.005 ^
+--cuda_device_id 0
+```
 ---
 
 ## Documentation
